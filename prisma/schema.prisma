@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model FeedbackItem {
+  id                   String          @id @default(cuid())
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  rawText              String
+  source               String
+  sourceId             String?         @unique
+  submittedBy          String?
+  submittedAt          DateTime?
+
+  problemStatement     String?
+  userIntent           String?
+  painDescription      String?
+  impactEstimate       String?
+  suggestedImprovement String?
+  confidenceScore      Float?
+
+  category             Category?
+  classification       Classification?
+
+  impactScore          Int?
+  severityScore        Int?
+  frequencyScore       Int?
+  strategicScore       Int?
+  effortScore          Int?
+  productPotential     Float?
+
+  partner              String?
+  theme                String?
+
+  status               Status          @default(PENDING)
+  routedTo             RoutingDest?
+  routedAt             DateTime?
+  routedBy             String?
+  routingNote          String?
+
+  mergedIntoId         String?
+  mergedInto           FeedbackItem?   @relation("Merges", fields: [mergedIntoId], references: [id])
+  mergedItems          FeedbackItem[]  @relation("Merges")
+
+  auditLogs            AuditLog[]
+
+  @@index([classification])
+  @@index([status])
+  @@index([productPotential])
+}
+
+model AuditLog {
+  id         String       @id @default(cuid())
+  createdAt  DateTime     @default(now())
+  feedbackId String
+  feedback   FeedbackItem @relation(fields: [feedbackId], references: [id])
+  action     String
+  actor      String?
+  note       String?
+
+  @@index([feedbackId])
+}
+
+enum Category {
+  PRODUCT_GAP
+  BUG
+  OPERATIONAL
+  MISUNDERSTANDING
+}
+
+enum Classification {
+  PRODUCT_OPPORTUNITY
+  BUG_DEFECT
+  OPERATIONAL_ISSUE
+  NOISE
+}
+
+enum Status {
+  PENDING
+  PROCESSED
+  ROUTED
+  CLOSED
+}
+
+enum RoutingDest {
+  PRODUCT_BACKLOG
+  ENGINEERING_BUG_QUEUE
+  OPS_PLAYBOOK
+  NOISE
+}
