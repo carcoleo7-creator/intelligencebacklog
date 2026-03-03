@@ -22,10 +22,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!Array.isArray(rows) || rows.length === 0) {
     return NextResponse.json({ error: "No rows provided" }, { status: 400 });
   }
-  if (rows.length > 500) {
-    return NextResponse.json({ error: "Maximum 500 rows per upload" }, { status: 400 });
-  }
-
   // Per-batch cap — client sends multiple batches for large files
   if (rows.length > 250) {
     return NextResponse.json({ error: "Maximum 250 rows per batch" }, { status: 400 });
