@@ -24,7 +24,7 @@ interface ImportResult {
   pendingOnly?: boolean; // CSV: stored without classification
 }
 
-const CSV_BATCH_SIZE = 200;
+const CSV_BATCH_SIZE = 50;
 
 // Minimal RFC-4180-compatible CSV parser
 function parseCSVLine(line: string): string[] {
@@ -189,17 +189,25 @@ export function IngestDialog() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ rows: batches[i], defaultChannel }),
         });
-        const data = await res.json();
-        if (!res.ok) {
-          setError(data.error ?? "Import failed");
+        // Parse JSON carefully — a server crash returns HTML
+        let data: Record<string, unknown> = {};
+        try {
+          data = await res.json();
+        } catch {
+          setError(`Server error (HTTP ${res.status}) — check Vercel logs`);
           setStatus("error");
           return;
         }
-        totalStored += data.stored ?? 0;
-        totalDuplicates += data.duplicates ?? 0;
-        totalSkipped += data.skipped ?? 0;
+        if (!res.ok) {
+          setError((data.error as string) ?? `HTTP ${res.status}`);
+          setStatus("error");
+          return;
+        }
+        totalStored += (data.stored as number) ?? 0;
+        totalDuplicates += (data.duplicates as number) ?? 0;
+        totalSkipped += (data.skipped as number) ?? 0;
       } catch {
-        setError("Network error");
+        setError("Could not reach server — check your connection");
         setStatus("error");
         return;
       }

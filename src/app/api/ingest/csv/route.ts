@@ -27,15 +27,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Maximum 250 rows per batch" }, { status: 400 });
   }
 
-  const result = await storeManyItems(
-    rows.map((row) => ({
-      rawText: row.text ?? "",
-      source: row.channel || defaultChannel,
-      sourceId: row.source_id ?? null,
-      submittedBy: row.submittedBy ?? null,
-      submittedAt: row.timestamp ? new Date(row.timestamp) : null,
-    }))
-  );
-
-  return NextResponse.json(result);
+  try {
+    const result = await storeManyItems(
+      rows.map((row) => ({
+        rawText: row.text ?? "",
+        source: row.channel || defaultChannel,
+        sourceId: row.source_id ?? null,
+        submittedBy: row.submittedBy ?? null,
+        submittedAt: row.timestamp ? new Date(row.timestamp) : null,
+      }))
+    );
+    return NextResponse.json(result);
+  } catch (err) {
+    console.error("CSV ingest error:", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Internal server error" },
+      { status: 500 }
+    );
+  }
 }
