@@ -49,12 +49,19 @@ export async function classifyFeedback(
   });
 
   const text =
-    message.content[0].type === "text" ? message.content[0].text.trim() : "";
+    message.content[0]?.type === "text" ? message.content[0].text.trim() : "";
+
+  if (!text) throw new Error("Empty response from Claude");
 
   // Strip any markdown code fences if present
   const jsonText = text.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
 
-  const parsed = JSON.parse(jsonText);
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch {
+    throw new Error(`Claude returned non-JSON response: ${jsonText.slice(0, 120)}`);
+  }
 
   const productPotential = calculateProductPotential({
     impact: parsed.impactScore ?? 3,

@@ -22,6 +22,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!Array.isArray(rows) || rows.length === 0) {
     return NextResponse.json({ error: "No rows provided" }, { status: 400 });
   }
+  if (rows.length > 500) {
+    return NextResponse.json({ error: "Maximum 500 rows per upload" }, { status: 400 });
+  }
 
   let imported = 0;
   let duplicates = 0;

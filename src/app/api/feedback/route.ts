@@ -15,8 +15,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const partner = searchParams.get("partner") || undefined;
   const theme = searchParams.get("theme") || undefined;
   const status = searchParams.get("status") || undefined;
-  const page = Number(searchParams.get("page") ?? "1");
-  const pageSize = Number(searchParams.get("pageSize") ?? "25");
+  const page = Math.max(1, Number(searchParams.get("page") ?? "1"));
+  const pageSize = Math.min(100, Math.max(1, Number(searchParams.get("pageSize") ?? "25")));
 
   const db = getDB();
 

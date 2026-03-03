@@ -1,14 +1,30 @@
+import { timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
 import { classifyFeedback } from "@/lib/claude";
 
 export const dynamic = "force-dynamic";
 
+function validateSecret(provided: string): boolean {
+  const expected = process.env.WEBHOOK_SECRET;
+  if (!expected || !provided) return false;
+  try {
+    const a = Buffer.from(provided);
+    const b = Buffer.from(expected);
+    // timingSafeEqual requires same-length buffers; pad shorter one
+    const len = Math.max(a.length, b.length);
+    const aPadded = Buffer.concat([a, Buffer.alloc(len - a.length)]);
+    const bPadded = Buffer.concat([b, Buffer.alloc(len - b.length)]);
+    return a.length === b.length && timingSafeEqual(aPadded, bPadded);
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  // Validate webhook secret
   const authHeader = request.headers.get("authorization") ?? "";
   const token = authHeader.replace("Bearer ", "");
-  if (token !== process.env.WEBHOOK_SECRET) {
+  if (!validateSecret(token)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

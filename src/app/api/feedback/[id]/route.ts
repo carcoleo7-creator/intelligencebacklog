@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
 
+const VALID_ROUTING_DESTS = new Set([
+  "PRODUCT_BACKLOG",
+  "ENGINEERING_BUG_QUEUE",
+  "OPS_PLAYBOOK",
+  "NOISE",
+]);
+
 export const dynamic = "force-dynamic";
 
 export async function GET(
@@ -51,6 +58,9 @@ export async function PATCH(
 
   if (!body.routedTo) {
     return NextResponse.json({ error: "routedTo is required" }, { status: 400 });
+  }
+  if (!VALID_ROUTING_DESTS.has(body.routedTo)) {
+    return NextResponse.json({ error: "Invalid routedTo value" }, { status: 400 });
   }
 
   const newStatus = body.routedTo === "NOISE" ? "CLOSED" : "ROUTED";
