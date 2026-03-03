@@ -56,7 +56,8 @@ export async function classifyFeedback(
   // Strip any markdown code fences if present
   const jsonText = text.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
 
-  let parsed: Record<string, unknown>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let parsed: any;
   try {
     parsed = JSON.parse(jsonText);
   } catch {
