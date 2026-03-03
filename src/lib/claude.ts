@@ -65,11 +65,11 @@ export async function classifyFeedback(
   }
 
   const productPotential = calculateProductPotential({
-    impact: parsed.impactScore ?? 3,
-    severity: parsed.severityScore ?? 3,
-    frequency: parsed.frequencyScore ?? 3,
-    strategic: parsed.strategicScore ?? 3,
-    effort: parsed.effortScore ?? 3,
+    impact: Number(parsed.impactScore ?? 3),
+    severity: Number(parsed.severityScore ?? 3),
+    frequency: Number(parsed.frequencyScore ?? 3),
+    strategic: Number(parsed.strategicScore ?? 3),
+    effort: Number(parsed.effortScore ?? 3),
   });
 
   return { ...parsed, productPotential };
