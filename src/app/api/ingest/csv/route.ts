@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ingestItem } from "@/lib/ingest";
+import { storeManyItems } from "@/lib/ingest";
 
 export const dynamic = "force-dynamic";
 
@@ -26,23 +26,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Maximum 500 rows per upload" }, { status: 400 });
   }
 
-  let imported = 0;
-  let duplicates = 0;
-  let skipped = 0;
+  // Per-batch cap — client sends multiple batches for large files
+  if (rows.length > 250) {
+    return NextResponse.json({ error: "Maximum 250 rows per batch" }, { status: 400 });
+  }
 
-  for (const row of rows) {
-    const result = await ingestItem({
+  const result = await storeManyItems(
+    rows.map((row) => ({
       rawText: row.text ?? "",
       source: row.channel || defaultChannel,
       sourceId: row.source_id ?? null,
       submittedBy: row.submittedBy ?? null,
       submittedAt: row.timestamp ? new Date(row.timestamp) : null,
-    });
+    }))
+  );
 
-    if (result.status === "processed" || result.status === "pending") imported++;
-    else if (result.status === "duplicate") duplicates++;
-    else skipped++;
-  }
-
-  return NextResponse.json({ imported, duplicates, skipped, total: rows.length });
+  return NextResponse.json(result);
 }

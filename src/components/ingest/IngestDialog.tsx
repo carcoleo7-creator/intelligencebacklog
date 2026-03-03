@@ -21,7 +21,10 @@ interface ImportResult {
   duplicates: number;
   skipped: number;
   total: number;
+  pendingOnly?: boolean; // CSV: stored without classification
 }
+
+const CSV_BATCH_SIZE = 200;
 
 // Minimal RFC-4180-compatible CSV parser
 function parseCSVLine(line: string): string[] {
@@ -81,6 +84,7 @@ export function IngestDialog() {
   const [status, setStatus] = useState<Status>("idle");
   const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState("");
+  const [progress, setProgress] = useState("");
 
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -88,6 +92,7 @@ export function IngestDialog() {
     setStatus("idle");
     setResult(null);
     setError("");
+    setProgress("");
   }
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -147,34 +152,68 @@ export function IngestDialog() {
       setError("Select the text column");
       return;
     }
-    const rows = csvRows
+
+    const allRows = csvRows
       .map((row) => ({
         text: row[textColumn] ?? "",
         channel: channelColumn ? row[channelColumn] : undefined,
       }))
       .filter((r) => r.text.trim().length >= 10);
 
+    if (allRows.length === 0) {
+      setError("No valid rows found — all entries are under 10 characters");
+      return;
+    }
+
     setStatus("loading");
     setResult(null);
     setError("");
-    try {
-      const res = await fetch("/api/ingest/csv", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows, defaultChannel }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Import failed");
+
+    // Split into batches to stay under the body size limit
+    const batches: typeof allRows[] = [];
+    for (let i = 0; i < allRows.length; i += CSV_BATCH_SIZE) {
+      batches.push(allRows.slice(i, i + CSV_BATCH_SIZE));
+    }
+
+    let totalStored = 0;
+    let totalDuplicates = 0;
+    let totalSkipped = 0;
+
+    for (let i = 0; i < batches.length; i++) {
+      setProgress(
+        batches.length > 1 ? `Storing batch ${i + 1} of ${batches.length}…` : "Storing…"
+      );
+      try {
+        const res = await fetch("/api/ingest/csv", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rows: batches[i], defaultChannel }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error ?? "Import failed");
+          setStatus("error");
+          return;
+        }
+        totalStored += data.stored ?? 0;
+        totalDuplicates += data.duplicates ?? 0;
+        totalSkipped += data.skipped ?? 0;
+      } catch {
+        setError("Network error");
         setStatus("error");
         return;
       }
-      setResult(data);
-      setStatus("done");
-    } catch {
-      setError("Network error");
-      setStatus("error");
     }
+
+    setProgress("");
+    setResult({
+      imported: totalStored,
+      duplicates: totalDuplicates,
+      skipped: totalSkipped,
+      total: allRows.length,
+      pendingOnly: true,
+    });
+    setStatus("done");
   }
 
   const csvColumns = csvRows.length > 0 ? Object.keys(csvRows[0]) : [];
@@ -404,9 +443,13 @@ export function IngestDialog() {
             <div className="mt-4 p-3 bg-green-50 rounded-lg text-sm text-green-800 flex items-start gap-2">
               <Check className="h-4 w-4 mt-0.5 shrink-0" />
               <div>
-                <p className="font-medium">{result.imported} item{result.imported !== 1 ? "s" : ""} imported</p>
+                <p className="font-medium">
+                  {result.imported} item{result.imported !== 1 ? "s" : ""} stored
+                  {result.pendingOnly ? " as Pending" : ""}
+                </p>
                 <p className="text-xs text-green-700 mt-0.5">
                   {result.duplicates} already existed · {result.skipped} skipped (too short)
+                  {result.pendingOnly && " · open each item to classify with AI"}
                 </p>
               </div>
             </div>
@@ -445,7 +488,7 @@ export function IngestDialog() {
                 {status === "loading" ? (
                   <>
                     <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
-                    Importing…
+                    {progress || "Importing…"}
                   </>
                 ) : (
                   "Import"

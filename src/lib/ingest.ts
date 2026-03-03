@@ -16,6 +16,7 @@ export interface IngestResult {
   status: IngestStatus;
 }
 
+/** Single-item ingest with synchronous Claude classification. Use for Slack / webhook. */
 export async function ingestItem(input: IngestInput): Promise<IngestResult> {
   if (input.rawText.trim().length < 10) {
     return { status: "skipped" };
@@ -77,3 +78,30 @@ export async function ingestItem(input: IngestInput): Promise<IngestResult> {
     return { id: item.id, status: "pending" };
   }
 }
+
+/** Bulk store items as PENDING without classification. Use for large CSV uploads. */
+export async function storeManyItems(
+  inputs: IngestInput[]
+): Promise<{ stored: number; duplicates: number; skipped: number }> {
+  const valid = inputs.filter((i) => i.rawText.trim().length >= 10);
+  const skipped = inputs.length - valid.length;
+
+  if (valid.length === 0) return { stored: 0, duplicates: 0, skipped };
+
+  const db = getDB();
+  const result = await db.feedbackItem.createMany({
+    data: valid.map((i) => ({
+      rawText: i.rawText.trim(),
+      source: i.source,
+      sourceId: i.sourceId ?? null,
+      submittedBy: i.submittedBy ?? null,
+      submittedAt: i.submittedAt ?? new Date(),
+      status: "PENDING",
+    })),
+    skipDuplicates: true,
+  });
+
+  const duplicates = valid.length - result.count;
+  return { stored: result.count, duplicates, skipped };
+}
+
